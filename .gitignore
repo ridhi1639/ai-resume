@@ -8,3 +8,9 @@ node_modules/
 .next/
 .env*.local
 .DS_Store
+
+# Database
+prisma/*.db
+prisma/*.db-journal
+*.db
+*.db-journal

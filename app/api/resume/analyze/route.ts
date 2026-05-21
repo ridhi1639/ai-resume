@@ -1,39 +1,39 @@
 import { generateText, Output } from 'ai'
+import { groq } from '@ai-sdk/groq'
 import { z } from 'zod'
 
+export const runtime = 'nodejs'
+
 const ResumeAnalysisSchema = z.object({
-  score: z.number().describe('Overall resume score from 0-100'),
-  skills: z.array(z.string()).describe('List of identified technical and soft skills'),
+  score: z.number(),
+  skills: z.array(z.string()),
   experience: z.object({
-    years: z.number().describe('Estimated years of experience'),
-    level: z.string().describe('Junior, Mid-level, Senior, or Lead'),
-    companies: z.array(z.string()).describe('List of companies mentioned'),
+    years: z.number(),
+    level: z.string(),
+    companies: z.array(z.string()),
   }),
-  strengths: z.array(z.string()).describe('Key strengths identified in the resume'),
-  improvements: z.array(z.string()).describe('Suggested improvements for the resume'),
-  keywords: z.array(z.string()).describe('Important keywords for ATS optimization'),
-  summary: z.string().describe('Brief professional summary'),
+  strengths: z.array(z.string()),
+  improvements: z.array(z.string()),
+  keywords: z.array(z.string()),
+  summary: z.string(),
 })
 
 export async function POST(req: Request) {
-  const { resumeText } = await req.json()
-
-  if (!resumeText) {
-    return Response.json({ error: 'No resume text provided' }, { status: 400 })
-  }
-
   try {
+    const { resumeText } = await req.json()
+
+    if (!resumeText) {
+      return Response.json({ error: 'No resume text provided' }, { status: 400 })
+    }
+
     const { output } = await generateText({
-      model: 'anthropic/claude-sonnet-4-20250514',
+      model: groq('llama-3.3-70b-versatile'),
       output: Output.object({ schema: ResumeAnalysisSchema }),
-      prompt: `Analyze the following resume and extract structured information. 
-Be thorough but concise in your analysis.
+      prompt: `Analyze the following resume and extract structured information.
+Be thorough but concise.
 
 Resume:
-${resumeText}
-
-Provide a comprehensive analysis including skills, experience level, strengths, 
-areas for improvement, and ATS-friendly keywords.`,
+${resumeText}`,
     })
 
     return Response.json(output)

@@ -186,6 +186,22 @@ export default function InterviewPage() {
     return 'bg-muted/50 border-border'
   }
 
+  const saveInterviewToDb = useCallback(async (answers: string[]) => {
+    const response = await fetch('/api/interviews', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        questions: questions.map((q) => q.question),
+        answers,
+        elapsedSeconds: elapsedTime,
+      }),
+    })
+    if (!response.ok) {
+      const err = await response.json().catch(() => null)
+      throw new Error(err?.error || 'Failed to save interview')
+    }
+  }, [elapsedTime])
+
   const startInterview = async () => {
     setIsInterviewStarted(true)
     // Send the first question to the AI
@@ -215,16 +231,20 @@ export default function InterviewPage() {
           text: `Good. Now please ask me this next interview question: "${questions[currentQuestionIndex + 1].question}"` 
         })
       } else {
-        // Interview complete - save data and redirect
-        localStorage.setItem('interviewAnswers', JSON.stringify([...userAnswers, currentAnswer]))
-        localStorage.setItem('interviewQuestions', JSON.stringify(questions.map(q => q.question)))
-        
-        await sendMessage({ 
-          text: "Thank you for the interview. Please provide a brief summary of my performance before I check my detailed results." 
+        const finalAnswers = [...userAnswers, currentAnswer]
+
+        await sendMessage({
+          text: "Thank you for the interview. Please provide a brief summary of my performance before I check my detailed results.",
         })
-        
-        setTimeout(() => {
-          router.push("/results")
+
+        setTimeout(async () => {
+          try {
+            await saveInterviewToDb(finalAnswers)
+            router.push("/results")
+          } catch (error) {
+            console.error('Save interview error:', error)
+            toast.error(error instanceof Error ? error.message : 'Failed to save interview')
+          }
         }, 3000)
       }
     }, 1500)
@@ -358,21 +378,22 @@ export default function InterviewPage() {
     }
   }, [isScreenSharing, screenStream])
 
-  const endInterview = useCallback(() => {
+  const endInterview = useCallback(async () => {
     if (screenStream) {
       screenStream.getTracks().forEach(track => track.stop())
     }
     if (videoStream) {
       videoStream.getTracks().forEach(track => track.stop())
     }
-    
-    // Save interview data
-    localStorage.setItem('interviewAnswers', JSON.stringify(userAnswers))
-    localStorage.setItem('interviewQuestions', JSON.stringify(questions.map(q => q.question)))
-    localStorage.setItem('interviewTime', elapsedTime.toString())
-    
-    router.push("/results")
-  }, [screenStream, videoStream, userAnswers, elapsedTime, router])
+
+    try {
+      await saveInterviewToDb(userAnswers)
+      router.push("/results")
+    } catch (error) {
+      console.error('Save interview error:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to save interview')
+    }
+  }, [screenStream, videoStream, userAnswers, router, saveInterviewToDb])
 
   const currentQuestion = questions[currentQuestionIndex]
   const progress = ((currentQuestionIndex + 1) / questions.length) * 100

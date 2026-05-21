@@ -122,22 +122,34 @@ export default function UploadPage() {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to analyze resume')
+        const errorBody = await response.json().catch(() => null)
+        throw new Error(errorBody?.error || 'Failed to analyze resume')
       }
 
       const result = await response.json()
       setAnalysisResult(result)
-      
-      // Store in localStorage for other pages
-      localStorage.setItem('resumeAnalysis', JSON.stringify(result))
-      localStorage.setItem('resumeText', resumeText)
+
+      const saveResponse = await fetch('/api/resumes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileName: file.name,
+          resumeText,
+          analysis: result,
+        }),
+      })
+
+      if (!saveResponse.ok) {
+        const saveError = await saveResponse.json().catch(() => null)
+        throw new Error(saveError?.error || 'Failed to save resume to database')
+      }
       
       setIsAnalyzing(false)
       setAnalysisComplete(true)
       toast.success('Resume analyzed successfully!')
     } catch (error) {
       console.error('Analysis error:', error)
-      setAnalysisError('Failed to analyze resume. Please try again.')
+      setAnalysisError(error instanceof Error ? error.message : 'Failed to analyze resume. Please try again.')
       setIsAnalyzing(false)
       toast.error('Failed to analyze resume')
     }
